@@ -1,6 +1,6 @@
+#include <SoftwareSerial.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <SoftwareSerial.h>
 
 // creates a "virtual" serial port/UART
 // connect BT module TX to D8
@@ -66,7 +66,7 @@ void loop() {
 
     String id = array_to_string(mfrc522.uid.uidByte, mfrc522.uid.size);
     lcd.print(id);
-    if (bluetooth.isListening()) {
+    if (bluetooth) {
       Serial.println("send bluetooth");
       bluetooth.println(id);
     }
