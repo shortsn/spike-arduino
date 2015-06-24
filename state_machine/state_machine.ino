@@ -68,17 +68,20 @@ void IdentifyCard() {
     Error(CARD_NOT_SUPPORTED);
     return;
   }
-  
+
   lcd.print(F("Card ID:"));
   lcd.setCursor(0, 1);
 
   String id = BufferToString(mfrc522.uid.uidByte, mfrc522.uid.size);
   lcd.print(id);
-  bluetooth.println(id);
+  bluetooth.print(id);
+
+  delay(1000);
+  state.transitionTo(Idle);
 }
 
 String BufferToString(byte *buffer, byte bufferSize) {
-  String result = "";
+  String result;
   for (byte i = 0; i < bufferSize; i++) {
     result += String(buffer[i], HEX);
   }
