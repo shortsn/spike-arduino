@@ -13,6 +13,14 @@ LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 #define SS_PIN  10
 
 #define CARD_NOT_SUPPORTED 1
+#define TIMEOUT 2
+#define COMMUNICATION_FAILED 3
+
+#define SOH 0x01
+#define STX 0x02
+#define ETX 0x03
+#define ACK 0x06
+#define NAK 0x15
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 MFRC522::MIFARE_Key key;
@@ -26,9 +34,11 @@ MFRC522::MIFARE_Key key;
 SoftwareSerial bluetooth(8, 7);
 
 State Idle = State(EnterIdle, WaitForNewCard, no_op);
-State Connect = State(IdentifyCard, no_op, no_op);
+State Connect = State(IdentifyCard, WaitForAck, no_op);
 
 FSM state = FSM(Idle);
+
+unsigned long timestamp;
 
 void setup() {
   bluetooth.begin(9600);
@@ -74,10 +84,31 @@ void IdentifyCard() {
 
   String id = BufferToString(mfrc522.uid.uidByte, mfrc522.uid.size);
   lcd.print(id);
-  bluetooth.print(id);
+  sendBuffer(mfrc522.uid.uidByte, mfrc522.uid.size);
+  timestamp = millis();
+}
 
-  delay(1000);
-  state.transitionTo(Idle);
+
+void WaitForAck() {
+  if (abs(timestamp - millis()) > 5000) {
+    Error(TIMEOUT);
+    return;
+  }
+
+  while (bluetooth.available() > 0) {
+    switch (bluetooth.read()) {
+      case ACK:
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("ACK FROM SERVER");
+        delay(2000);
+        state.transitionTo(Idle);
+        return;
+      case NAK:
+        Error(COMMUNICATION_FAILED);
+        return;
+    }
+  }
 }
 
 String BufferToString(byte *buffer, byte bufferSize) {
@@ -88,10 +119,18 @@ String BufferToString(byte *buffer, byte bufferSize) {
   return result;
 }
 
+void sendBuffer(byte *buffer, byte size) {
+  bluetooth.write(SOH);
+  bluetooth.write(STX);
+  bluetooth.write(mfrc522.uid.uidByte, mfrc522.uid.size);
+  bluetooth.write(ETX);
+}
+
 void Error(byte code) {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Error " + String(code));
+  lcd.print("Error ");
+  lcd.print(code);
   state.transitionTo(Idle);
   delay(2000);
 }
